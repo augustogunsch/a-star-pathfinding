@@ -2,31 +2,31 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Controller class of the game.
+/// </summary>
 public class Director : MonoBehaviour
 {
-    public GameObject Target;
-    public GameObject Pursuer;
-    Node[] path;
+	public GameObject Target;
+	public GameObject Pursuer;
+	Node[] path;
+	public NodeGrid Grid;
 
-    void Start()
-    {
-        path = Pathfinding.FindPath(Target.transform.position, Pursuer.transform.position);
-        Debug.Log("Done");
-        string message = "";
-        foreach(var node in path)
-            message += $"{node.WorldPosition} => ";
-        Debug.Log(message);
-    }
+	void Update()
+	{
+		path = Pathfinding.FindPath(Target.transform.position, Pursuer.transform.position, Grid);
+	}
 
-    private void OnDrawGizmos()
-    {
-        Gizmos.color = Color.magenta;
-        if (path != null)
-        {
-            foreach(var node in path)
-            {
-                Gizmos.DrawSphere(node.WorldPosition + Vector3.up, 1);
-            }
-        }
-    }
+	// DEBUG: draws the path.
+	private void OnDrawGizmos()
+	{
+		Gizmos.color = Color.magenta;
+		if (path != null)
+		{
+			foreach (var node in path)
+			{
+				Gizmos.DrawSphere(node.WorldPosition + Vector3.up, 1);
+			}
+		}
+	}
 }

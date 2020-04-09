@@ -42,10 +42,7 @@ public class NodeGrid : MonoBehaviour
 	private void Awake()
 	{
 		terrainTransform = gameObject.GetComponent<Transform>();
-	}
 
-	private void Start()
-	{
 		halfNodeSize = NodeSize / 2;
 
 		worldXSize = terrainTransform.lossyScale.x;

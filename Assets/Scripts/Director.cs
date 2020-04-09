@@ -12,10 +12,10 @@ public class Director : MonoBehaviour
 	Node[] path;
 	public NodeGrid Grid;
 
-	void Update()
-	{
-		path = Pathfinding.FindPath(Target.transform.position, Pursuer.transform.position, Grid);
-	}
+	//void Update()
+	//{
+	//	path = Pathfinding.FindPath(Target.transform.position, Pursuer.transform.position, Grid);
+	//}
 
 	// DEBUG: draws the path.
 	private void OnDrawGizmos()

@@ -1,28 +1,35 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Pathfinding
+public class PathFinder : MonoBehaviour
 {
+	public NodeGrid Grid;
+
+	internal void RequestPath(Vector3 from, Vector3 to, Action<Vector3[], bool> callback)
+	{
+		StartCoroutine(FindPath(from, to, callback));
+	}
 	/// <summary>
 	/// Finds a path between two points on the grid.
 	/// </summary>
 	/// <param name="from">initial position</param>
 	/// <param name="to">target position</param>
 	/// <returns>path array</returns>
-	public static Node[] FindPath(Vector3 from, Vector3 to, NodeGrid grid)
+	private IEnumerator FindPath(Vector3 from, Vector3 to, Action<Vector3[], bool> callback)
 	{
 		/* F cost = G cost + H cost
 		 * G cost = distance from origin to node
 		 * H cost = distance from node to target */
 
 		// Open set => Nodes that are yet to be evaluated.
-		BinaryHeap<Node> openSet = new BinaryHeap<Node>(grid.NodeCount);
+		BinaryHeap<Node> openSet = new BinaryHeap<Node>(Grid.NodeCount);
 		// Closes set => Nodes that have been claimed by another.
 		HashSet<Node> closedSet = new HashSet<Node>();
 
-		Node initialNode = grid.GetNodeFromWorldPosition(from);
-		Node targetNode = grid.GetNodeFromWorldPosition(to);
+		Node initialNode = Grid.GetNodeFromWorldPosition(from);
+		Node targetNode = Grid.GetNodeFromWorldPosition(to);
 
 		// The initial node also must pass through the first iteration.
 		//initialNode.HCost = GetDistance(initialNode, targetNode);
@@ -37,11 +44,12 @@ public class Pathfinding
 			// Returning the path if the node is the target.
 			if (currentNode.Equals(targetNode))
 			{
-				return RetracePath(initialNode, targetNode);
+				callback.Invoke(RetracePath(initialNode, targetNode), true);
+				yield break;
 			}
 
 			// Getting the surrounding nodes.
-			Node[] neighbors = grid.GetNeighbors(currentNode);
+			Node[] neighbors = Grid.GetNeighbors(currentNode);
 
 			// Deciding what to do with each neighbor.
 			foreach (var neighbor in neighbors)
@@ -74,7 +82,8 @@ public class Pathfinding
 				}
 			}
 		}
-		throw new NoPathException($"No path between positions {from} and {to}.");
+		yield return null;
+		callback.Invoke(null, false);
 	}
 
 	private static int GetDistance(Node origin, Node target)
@@ -93,7 +102,7 @@ public class Pathfinding
 		return distance;
 	}
 
-	private static Node[] RetracePath(Node startNode, Node currentNode)
+	private static Vector3[] RetracePath(Node startNode, Node currentNode)
 	{
 		List<Node> path = new List<Node>();
 		do
@@ -102,7 +111,27 @@ public class Pathfinding
 			currentNode = currentNode.ParentNode;
 		}
 		while (!currentNode.Equals(startNode));
-		path.Reverse();
-		return path.ToArray();
+
+		Vector3[] points = SimplifyPath(path);
+
+		Array.Reverse(points);
+		return points;
+	}
+
+	private static Vector3[] SimplifyPath(List<Node> nodePath)
+	{
+		List<Vector3> pointPath = new List<Vector3>();
+		Vector3 previousDirection = Vector3.zero;
+
+		for(int i = 1; i < nodePath.Count; i++)
+		{
+			Vector3 thisDirection = nodePath[i].WorldPosition - nodePath[i - 1].WorldPosition;
+			if(thisDirection != previousDirection)
+			{
+				pointPath.Add(nodePath[i].WorldPosition);
+			}
+			previousDirection = thisDirection;
+		}
+		return pointPath.ToArray();
 	}
 }

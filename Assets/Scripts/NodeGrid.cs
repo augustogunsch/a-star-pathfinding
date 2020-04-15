@@ -8,7 +8,7 @@ using UnityEngine;
 /// </summary>
 public class NodeGrid : MonoBehaviour
 {
-
+	public bool DrawGridGizmos;
 	[SerializeField]
 	private float nodeSize = 1;
 	private float halfNodeSize;
@@ -21,6 +21,8 @@ public class NodeGrid : MonoBehaviour
 	private Node[,] nodes;
 
 	public LayerMask UnwalkableMask;
+	[SerializeField]
+	public WalkableMask[] WalkableMasks;
 
 	private int gridSizeX;
 	private int gridSizeY;
@@ -31,7 +33,10 @@ public class NodeGrid : MonoBehaviour
 	private float worldXCorner;
 	private float worldY;
 	private float worldZCorner;
-	private Vector3 worldGridCorner
+
+	public int BrushSize;
+
+	private Vector3 WorldGridCorner
 	{
 		get
 		{
@@ -58,6 +63,15 @@ public class NodeGrid : MonoBehaviour
 		DrawGrid();
 	}
 
+	private void Start()
+	{
+		foreach (var penalty in WalkableMasks)
+		{
+			if (penalty.MovementPenalty > largestPenalty)
+				largestPenalty = penalty.MovementPenalty;
+		}
+	}
+
 	private void DrawGrid()
 	{
 		nodes = new Node[gridSizeX, gridSizeY];
@@ -67,9 +81,13 @@ public class NodeGrid : MonoBehaviour
 		{
 			for (int y = 0; y < gridSizeY; y++)
 			{
-				nodes[x, y] = new Node(x, y, CalcNodePosition(x, y), nodeSize, UnwalkableMask);
+				Vector3 position = CalcNodePosition(x, y);
+				int movementPenalty = GetMovementPenalty(position);
+				nodes[x, y] = new Node(x, y, position, nodeSize, UnwalkableMask, movementPenalty);
 			}
 		}
+
+		BlurWeights(BrushSize);
 	}
 
 	/// <summary>
@@ -80,7 +98,7 @@ public class NodeGrid : MonoBehaviour
 	public Node GetNodeFromWorldPosition(Vector3 position)
 	{
 		// Compesates the difference of the grid world position.
-		Vector3 localPosition = (position - worldGridCorner);
+		Vector3 localPosition = (position - WorldGridCorner);
 
 		// Adjusts the scale.
 		localPosition /= nodeSize;
@@ -97,7 +115,7 @@ public class NodeGrid : MonoBehaviour
 		Vector3 position = new Vector3(gridX * nodeSize, 0, gridY * nodeSize);
 
 		// Adding compesation for the difference in coordinates.
-		position += worldGridCorner;
+		position += WorldGridCorner;
 
 		// Aligning node.
 		position += new Vector3(HalfNodeSize, 0, HalfNodeSize);
@@ -126,16 +144,116 @@ public class NodeGrid : MonoBehaviour
 		return neighbours.ToArray();
 	}
 
-	// DEBUG: draws the grid as gizmos once the game starts.
-	//public void OnDrawGizmos()
-	//{
-	//    if(nodes != null)
-	//    {
-	//        Gizmos.color = Color.black;
-	//        foreach(var node in nodes)
-	//        {
-	//            Gizmos.DrawWireCube(node.WorldPosition + Vector3.up * 4, Vector3.one * nodeSize);
-	//        }
-	//    }
-	//}
+	private int largestPenalty = 0;
+	public void OnDrawGizmos()
+	{
+		if (nodes != null && DrawGridGizmos)
+		{
+			foreach (var node in nodes)
+			{
+				if (!node.Walkable)
+				{
+					Gizmos.color = new Color(1, 0, 0, 0.8f);
+				}
+				else
+				{
+					Gizmos.color = Color.Lerp(Color.white, Color.black,
+						Mathf.InverseLerp(0, largestPenalty, node.Weight));
+				}
+				Gizmos.DrawCube(node.WorldPosition + Vector3.up * 0, Vector3.one * nodeSize);
+			}
+		}
+	}
+
+	[Serializable]
+	public class WalkableMask
+	{
+		public LayerMask LayerMask;
+		public int MovementPenalty;
+	}
+
+	private int GetMovementPenalty(Vector3 position)
+	{
+		Int32 allWalkableMasks = 0;
+
+		foreach (var layer in WalkableMasks)
+		{
+			allWalkableMasks |= layer.LayerMask.value;
+		}
+
+		RaycastHit hit;
+		Physics.Raycast(position + Vector3.up * 50, Vector3.down, out hit, 100, allWalkableMasks,
+			QueryTriggerInteraction.Ignore);
+
+		return GetPenaltyFromLayer(hit.collider.gameObject.layer);
+	}
+
+	private int GetPenaltyFromLayer(int layer)
+	{
+		foreach (var lay in WalkableMasks)
+		{
+			if (lay.LayerMask.value == Math.Pow(2, layer))
+			{
+				return lay.MovementPenalty;
+			}
+		}
+		throw new ArgumentException("The provided layer is not in the WalkableMasks array.");
+	}
+
+	private void BlurWeights(int brushSize)
+	{
+		int[,] horizontalDirection = new int[gridSizeX, gridSizeY];
+
+		// Must bea an odd number
+		int kernelSize = brushSize * 2 + 1;
+		int kernelArea = kernelSize * kernelSize;
+		int halfKernel = brushSize;
+		int halfKernelPlus = halfKernel + 1;
+
+		// Horizontal way
+		for (int y = 0; y < gridSizeY; y++)
+		{
+			// First node
+			int result = 0;
+			for (int i = -halfKernel; i < halfKernelPlus; i++)
+			{
+				int index = Mathf.Clamp(i, 0, halfKernel);
+				result += nodes[index, y].Weight;
+			}
+			horizontalDirection[0, y] = result;
+
+			// Remainder
+			for (int x = 1; x < gridSizeX; x++)
+			{
+				int removeIndex = Mathf.Clamp(x - halfKernelPlus, 0, gridSizeX - 1);
+				int addIndex = Mathf.Clamp(x + halfKernel, 0, gridSizeX - 1);
+
+				result += nodes[addIndex, y].Weight - nodes[removeIndex, y].Weight;
+				horizontalDirection[x, y] = result;
+			}
+		}
+
+		// Vertical way
+		for (int x = 0; x < gridSizeX; x++)
+		{
+			// First node
+			int result = 0;
+			for (int i = -halfKernel; i < halfKernelPlus; i++)
+			{
+				int index = Mathf.Clamp(i, 0, halfKernel);
+				result += horizontalDirection[x, index];
+			}
+			nodes[x, 0].Weight = result / kernelArea;
+
+			// Remainder
+			for (int y = 1; y < gridSizeY; y++)
+			{
+				int removeIndex = Mathf.Clamp(y - halfKernelPlus, 0, gridSizeY - 1);
+				int addIndex = Mathf.Clamp(y + halfKernel, 0, gridSizeY - 1);
+
+				result += horizontalDirection[x, addIndex] - horizontalDirection[x, removeIndex];
+				nodes[x, y].Weight = result / kernelArea;
+			}
+		}
+	}
 }

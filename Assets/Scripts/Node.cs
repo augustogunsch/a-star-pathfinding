@@ -6,6 +6,7 @@ public class Node : IComparable, IHeapable
 	public Vector3 WorldPosition;
 	private Vector3 size;
 	private LayerMask unwalkableMask;
+	public int Weight;
 	public bool Walkable;
 	public int GridX;
 	public int GridY;
@@ -34,12 +35,16 @@ public class Node : IComparable, IHeapable
 	/// <param name="worldPosition">World position of the node.</param>
 	/// <param name="size">Size of the node.</param>
 	/// <param name="unwalkableMask">Unwalkable layer mask.</param>
-	public Node(int gridX, int gridY, Vector3 worldPosition, float size, LayerMask unwalkableMask)
+	/// <param name="movementPenalty">Movement penalty.</param>
+	public Node(int gridX, int gridY, Vector3 worldPosition, float size, LayerMask unwalkableMask,
+		int movementPenalty)
 	{
 		WorldPosition = worldPosition;
 
 		GridX = gridX;
 		GridY = gridY;
+
+		Weight = movementPenalty;
 
 		this.size = new Vector3(size, size, size);
 		this.unwalkableMask = unwalkableMask;

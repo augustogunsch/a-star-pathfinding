@@ -61,7 +61,8 @@ public class PathFinder : MonoBehaviour
 
 				/* newGCost refers to the new hypothetical G cost of the neighbor 
 				 (it could have been assigned by another node and now be lower by this path).*/
-				int newGCost = GetDistance(currentNode, neighbor) + currentNode.GCost;
+				int newGCost = GetDistance(currentNode, neighbor) + currentNode.GCost + 
+					neighbor.Weight;
 				bool openSetHasNotNeighbor = !openSet.Contains(neighbor);
 				if (openSetHasNotNeighbor || newGCost < neighbor.GCost)
 				{
